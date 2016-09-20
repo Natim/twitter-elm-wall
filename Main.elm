@@ -10,14 +10,17 @@ import String
 import Task
 
 
+kintoUrl : String
 kintoUrl =
     "https://kinto-ota.dev.mozaws.net/v1/buckets/dadounets/collections/wall/records?attachment.mimetype=image/jpeg"
 
 
+attachmentUrl : String
 attachmentUrl =
     "https://kinto-ota.dev.mozaws.net/attachments/"
 
 
+main : Program Never
 main =
     Html.App.program
         { init = init
