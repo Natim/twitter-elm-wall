@@ -1,0 +1,29 @@
+{
+  "name": "twitter-elm-wall",
+  "version": "1.0.0",
+  "description": "Twitter Elm Wall",
+  "main": "index.js",
+  "scripts": {
+    "build": "node_modules/.bin/elm-make src/Main.elm --output=build/app.js",
+    "start": "node_modules/.bin/elm-reactor",
+    "live": "node_modules/.bin/elm-live src/Main.elm --output=elm.js",
+    "publish-to-gh-pages": "npm run build && cp index.html build/ && node_modules/.bin/gh-pages --dist build/",
+    "test": "node_modules/.bin/elm-test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Natim/twitter-elm-wall.git"
+  },
+  "author": "",
+  "license": "Apache 2.0",
+  "bugs": {
+    "url": "https://github.com/Natim/twitter-elm-wall/issues"
+  },
+  "homepage": "https://github.com/Natim/twitter-elm-wall#readme",
+  "devDependencies": {
+    "elm": "^0.17.1",
+    "elm-live": "^2.5.0",
+    "elm-test": "^0.17.3",
+    "gh-pages": "^0.11.0"
+  }
+}
