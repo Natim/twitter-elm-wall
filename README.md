@@ -2,6 +2,8 @@
 
 A Twitter Wall in [Elm](elm-lang.org).
 
+[![Build Status](https://travis-ci.org/Natim/twitter-elm-wall.svg?branch=master)](https://travis-ci.org/Natim/twitter-elm-wall)
+
 ## Setup
 
 Node and Elm v0.17 should be installed on your system. Then:
