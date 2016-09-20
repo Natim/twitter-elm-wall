@@ -1,0 +1,13 @@
+ul {
+  list-style-type: none;
+}
+
+ul li {
+ float: left; 
+}
+
+ul li img {
+  max-height: 200px;
+  max-with: 300px;
+  margin: 0 10px;
+}
