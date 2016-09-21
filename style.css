@@ -1,0 +1,8 @@
+ul {
+  list-style-type: none;
+}
+
+ul li {
+    margin: 10px;
+    background: #eee;
+}
