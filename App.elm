@@ -1,58 +1,71 @@
 module App exposing (..)
 
+import Date exposing (Date)
 import Html
 import Html.Attributes
+import Html.Events
+import Time exposing (Time, hour, second)
+import Utils
+
+
+-- import Html.Attributes
+
 import Http
+import HttpBuilder
 import Json.Decode as Json
-import Json.Decode exposing ((:=))
-import String
 import Task
 
 
 type Msg
-    = Foo
-    | FetchSucceed (List Image)
-    | FetchFail Http.Error
+    = FetchSucceed (HttpBuilder.Response (List Tweet))
+    | FetchFail (HttpBuilder.Error String)
+    | Tick Time
+    | Refresh Time
+    | NewSearch String
 
 
-kintoUrl : String
-kintoUrl =
-    "https://kinto-ota.dev.mozaws.net/v1/buckets/dadounets/collections/wall/records?attachment.mimetype=image/jpeg"
+twitterBearerToken : String
+twitterBearerToken =
+    "AAAAAAAAAAAAAAAAAAAAAJc9xAAAAAAAEqIw9D7P%2FVH3tw3WZyFcIyhmUv4%3D5eWCMgEwC4YSfnMzkH7PZ0HeN4ql6i0hfZQ9EZ6KYXPsoXqGPy"
 
 
-attachmentUrl : String
-attachmentUrl =
-    "https://kinto-ota.dev.mozaws.net/attachments/"
+twitterApiUrl : String
+twitterApiUrl =
+    "https://cors-anywhere.herokuapp.com/https://api.twitter.com/1.1/search/tweets.json?q="
 
 
 
 -- MODEL
 
 
-type alias Url =
+type alias Author =
     String
 
 
-type alias Title =
+type alias Text =
     String
 
 
-type alias Image =
-    { title : Title, url : Url }
+type alias Tweet =
+    { author : Author, text : Text, date : Date }
 
 
 type alias Model =
-    { images : List Image
+    { tweets : List Tweet
     , error : Maybe String
+    , currentTime : Time
+    , currentSearch : String
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { images = []
+    ( { tweets = []
       , error = Nothing
+      , currentTime = 0
+      , currentSearch = "#elm"
       }
-    , getImages
+    , ( getTweets "#elm")
     )
 
 
@@ -64,27 +77,27 @@ view : Model -> Html.Html Msg
 view model =
     Html.div
         []
-        [ Html.text (Maybe.withDefault "" model.error)
+        [ Html.h1 [] [ Html.text "Tweet Elm Wall" ]
+        , Html.text (Maybe.withDefault "" model.error)
         , Html.br [] []
-        , Html.ul [] (List.map displayImage model.images)
+        , Html.ul [] (List.map (displayTweet model.currentTime) model.tweets)
+        , Html.input [ Html.Events.onInput NewSearch, Html.Attributes.value model.currentSearch ] []
+        , Html.button [ Html.Events.onClick (Refresh model.currentTime) ] [ Html.text "Refresh" ]
         ]
 
 
-displayImage : Image -> Html.Html Msg
-displayImage image =
+displayTweet : Time -> Tweet -> Html.Html Msg
+displayTweet currentTime tweet =
     let
         author =
-            "Author: " ++ image.title
-
-        fullUrl =
-            attachmentUrl ++ image.url
+            "Author: " ++ tweet.author
     in
         Html.li []
-            [ Html.img
-                [ Html.Attributes.src fullUrl
-                , Html.Attributes.title author
-                ]
-                []
+            [ Html.text tweet.text
+            , Html.br [] []
+            , Html.text author
+            , Html.text " — "
+            , Html.text (Utils.timeAgo (Date.toTime tweet.date) currentTime)
             ]
 
 
@@ -95,52 +108,61 @@ displayImage image =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Foo ->
-            ( model, Cmd.none )
+        Tick newTime ->
+            ( { model | currentTime = newTime }, Cmd.none )
 
-        FetchSucceed data ->
-            ( { model | images = data }, Cmd.none )
+        Refresh _ ->
+            ( model, ( getTweets model.currentSearch ) )
+
+        NewSearch query ->
+            ( { model | currentSearch = query }, Cmd.none )
+
+        FetchSucceed response ->
+            ( { model | tweets = response.data }, Cmd.none )
 
         FetchFail error ->
             ( { model | error = Just (toString error) }, Cmd.none )
 
 
-getImages : Cmd Msg
-getImages =
-    Task.perform FetchFail FetchSucceed (Http.get decodeImageUrl kintoUrl)
+getTweets : String -> Cmd Msg
+getTweets query =
+    Task.perform
+        FetchFail
+        FetchSucceed
+        (HttpBuilder.get (twitterApiUrl ++ (Http.uriEncode query))
+            |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ twitterBearerToken)
+            |> HttpBuilder.send (HttpBuilder.jsonReader decodeTweet) HttpBuilder.stringReader
+        )
 
 
-decodeImageUrl : Json.Decoder (List Image)
-decodeImageUrl =
-    Json.at [ "data" ] (Json.list getImage)
+decodeTweet : Json.Decoder (List Tweet)
+decodeTweet =
+    Json.at [ "statuses" ] (Json.list getTweet)
 
 
-getImage : Json.Decoder Image
-getImage =
-    Json.object2 Image getTitle getLocation
+getTweet : Json.Decoder Tweet
+getTweet =
+    Json.object3 Tweet getAuthor getText getDate
 
 
-getTitle : Json.Decoder Title
-getTitle =
-    Json.at [ "from", "first_name" ] Json.string
+getAuthor : Json.Decoder Author
+getAuthor =
+    Json.at [ "user", "name" ] Json.string
 
 
-getLocation : Json.Decoder Url
-getLocation =
-    Json.at [ "attachment", "location" ] normalizeUrl
+getText : Json.Decoder Text
+getText =
+    Json.at [ "text" ] Json.string
 
 
-normalizeUrl : Json.Decoder Url
-normalizeUrl =
-    Json.map stripAbsolute Json.string
+getDate : Json.Decoder Date
+getDate =
+    Json.at [ "created_at" ] normalizeDate
 
 
-stripAbsolute : String -> Url
-stripAbsolute str =
-    if String.startsWith attachmentUrl str then
-        String.dropLeft (String.length attachmentUrl) str
-    else
-        str
+normalizeDate : Json.Decoder Date
+normalizeDate =
+    Json.map (\d -> Result.withDefault (Date.fromTime 0) (Date.fromString d)) Json.string
 
 
 
@@ -149,4 +171,7 @@ stripAbsolute str =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    Sub.batch
+        [ Time.every second Tick
+        , Time.every hour Refresh
+        ]
