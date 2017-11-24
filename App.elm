@@ -13,12 +13,10 @@ import Utils
 import Http
 import HttpBuilder
 import Json.Decode as Json
-import Task
 
 
 type Msg
-    = FetchSucceed (HttpBuilder.Response (List Tweet))
-    | FetchFail (HttpBuilder.Error String)
+    = Fetch (Result Http.Error (List Tweet))
     | Tick Time
     | Refresh Time
     | NewSearch String
@@ -65,7 +63,7 @@ init =
       , currentTime = 0
       , currentSearch = "#elm"
       }
-    , ( getTweets "#elm")
+    , (getTweets "#elm")
     )
 
 
@@ -112,27 +110,24 @@ update msg model =
             ( { model | currentTime = newTime }, Cmd.none )
 
         Refresh _ ->
-            ( model, ( getTweets model.currentSearch ) )
+            ( model, (getTweets model.currentSearch) )
 
         NewSearch query ->
             ( { model | currentSearch = query }, Cmd.none )
 
-        FetchSucceed response ->
-            ( { model | tweets = response.data }, Cmd.none )
+        Fetch (Ok response) ->
+            ( { model | tweets = response }, Cmd.none )
 
-        FetchFail error ->
+        Fetch (Err error) ->
             ( { model | error = Just (toString error) }, Cmd.none )
 
 
 getTweets : String -> Cmd Msg
 getTweets query =
-    Task.perform
-        FetchFail
-        FetchSucceed
-        (HttpBuilder.get (twitterApiUrl ++ (Http.uriEncode query))
-            |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ twitterBearerToken)
-            |> HttpBuilder.send (HttpBuilder.jsonReader decodeTweet) HttpBuilder.stringReader
-        )
+    HttpBuilder.get (twitterApiUrl ++ (Http.encodeUri query))
+        |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ twitterBearerToken)
+        |> HttpBuilder.withExpect (Http.expectJson decodeTweet)
+        |> HttpBuilder.send Fetch
 
 
 decodeTweet : Json.Decoder (List Tweet)
@@ -142,7 +137,7 @@ decodeTweet =
 
 getTweet : Json.Decoder Tweet
 getTweet =
-    Json.object3 Tweet getAuthor getText getDate
+    Json.map3 Tweet getAuthor getText getDate
 
 
 getAuthor : Json.Decoder Author
