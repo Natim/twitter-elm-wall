@@ -1,13 +1,12 @@
 module Main exposing (..)
 
-import Html.App
-import String
-import App exposing (init, view, update, subscriptions)
+import Html
+import App exposing (Model, Msg, init, view, update, subscriptions)
 
 
-main : Program Never
+main : Program Never Model Msg
 main =
-    Html.App.program
+    Html.program
         { init = init
         , view = view
         , update = update
